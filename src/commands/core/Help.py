@@ -1,5 +1,6 @@
 from libs import BaseCommand, MessageClass
-
+import requests
+from io import BytesIO
 
 class Command(BaseCommand):
     def __init__(self, client, handler):
@@ -23,24 +24,18 @@ class Command(BaseCommand):
         query = contex.text.strip().lower() if contex.text else None
 
         if query:
+            # Single command help
             command = self.handler.commands.get(query) or next(
-                (
-                    cmd
-                    for cmd in self.handler.commands.values()
-                    if query in cmd.config.get("aliases", [])
-                ),
+                (cmd for cmd in self.handler.commands.values() if query in cmd.config.get("aliases", [])),
                 None,
             )
-
             if not command:
                 return self.client.reply_message("❌ Command not found.", M)
 
             options = command.config
-            if (
-                M.sender.number not in self.client.config.mods
-                and options.category == "dev"
-            ):
+            if M.sender.number not in self.client.config.mods and options.category == "dev":
                 return self.client.reply_message("❌ Command not found.", M)
+
             desc = options.get("description", {})
             aliases = ", ".join(options.get("aliases", [])) or "No aliases"
             usage = f"{prefix}{options.command} {desc.get('usage', '')}".strip()
@@ -55,19 +50,18 @@ class Command(BaseCommand):
 """
             return self.client.reply_message(help_text, M)
 
-        # Group all commands by category
+        # Full help menu
         grouped = {}
         for cmd in self.handler.commands.values():
             cat = cmd.config.get("category", "Uncategorized").capitalize()
             grouped.setdefault(cat, []).append(cmd)
 
+        # Assign emojis to categories
         emoji_array = ["🎎", "🔰", "🧑‍💻", "🍥", "🔊", "🎼", "🔍", "🧰"]
         category_names = sorted(grouped.keys())
-        emoji_map = {
-            cat: emoji_array[i % len(emoji_array)]
-            for i, cat in enumerate(category_names)
-        }
+        emoji_map = {cat: emoji_array[i % len(emoji_array)] for i, cat in enumerate(category_names)}
 
+        # Header
         header = f"""
 > 🎫  *{self.client.config.name} Command List*  🎫
 
@@ -79,10 +73,12 @@ https://shorturl.at/WLhPG
 
         lines = [header]
 
+        # Categories
         for cat in category_names:
             emoji = emoji_map.get(cat, "🔹")
             if M.sender.number not in self.client.config.mods and cat == "Dev":
                 continue
+            # Add spacing before category
             lines.append(f"\n> ━━━━❰ {emoji} *{cat.upper()}* {emoji} ❱━━━━\n")
             block = []
             for cmd in grouped[cat]:
@@ -91,8 +87,10 @@ https://shorturl.at/WLhPG
                 usage = desc.get("usage", "")
                 formatted = f"{prefix}{self.client.utils.to_small_caps(cfg.command)} {self.client.utils.to_small_caps(usage)}".strip()
                 block.append(formatted)
-            lines.append("➨ ```" + ", ".join(block) + "```")
+            # Commands one per line inside monospace
+            lines.append("➨ ```\n" + "\n".join(block) + "\n```")
 
+        # Notes section
         lines.append(
             "\n📇 *Notes:*"
             "\n➪ Use `-help <command>` to view details."
@@ -100,4 +98,17 @@ https://shorturl.at/WLhPG
             "\n➪ <> = required, [ ] = optional (omit brackets when typing)."
         )
 
-        self.client.reply_message("\n".join(lines), M)
+        final_text = "\n".join(lines)
+
+        # Send image from your Catbox link with help text as caption
+        image_url = "https://files.catbox.moe/qjtp8v.jpg"
+        try:
+            resp = requests.get(image_url)
+            if resp.status_code == 200:
+                image_bytes = BytesIO(resp.content)
+                self.client.send_image(M.gcjid, image_bytes, caption=final_text)
+            else:
+                self.client.reply_message(final_text, M)
+        except Exception as e:
+            self.client.log.error(f"[HelpImageError] {e}")
+            self.client.reply_message(final_text, M)
