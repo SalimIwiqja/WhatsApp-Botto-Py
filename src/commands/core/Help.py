@@ -74,7 +74,7 @@ class Command(BaseCommand):
 💡 *Prefix:* `{prefix}`
 
 🎋 *Support us:* 
-https://www.instagram.com/das_abae
+https://shorturl.at/WLhPG
 """.strip()
 
         lines = [header]
