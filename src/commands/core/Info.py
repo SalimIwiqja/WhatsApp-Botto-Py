@@ -27,9 +27,9 @@ class Command(BaseCommand):
 
     def exec(self, M: MessageClass, _):
         try:
-            bot_name = "Void-Bot"
+            bot_name = "Aeson-Bot"
             version = "1.0.0"
-            developer = "Debanjan Das"
+            developer = "Salim"
             uptime = self.get_uptime()
             prefix = self.client.config.prefix
             framework = "Neonize + Custom Handler"
