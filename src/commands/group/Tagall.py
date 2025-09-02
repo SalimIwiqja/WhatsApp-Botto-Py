@@ -32,10 +32,10 @@ class Command(BaseCommand):
             tags = []
 
             for member in participants:
-                user = member.JID.User
-                if user != self.client.get_me().JID.User:
-                    mentions.append(user)
-                    tags.append(f"@{user}")
+                # Skip the bot itself
+                if member.JID.User != self.client.get_me().JID.User:
+                    mentions.append(member.JID)  # full JID for actual mention
+                    tags.append(f"@{member.JID.User}")  # show number as text
 
             prefix_text = (
                 contex.text.strip()
@@ -44,7 +44,12 @@ class Command(BaseCommand):
             )
             message = f"{prefix_text}\n\n" + " ".join(tags)
 
-            self.client.send_message(M.gcjid, message)
+            # Send message with proper mentions
+            self.client.send_message(
+                M.gcjid,
+                message,
+                mentions=mentions
+            )
 
         except Exception as e:
             self.client.reply_message(
