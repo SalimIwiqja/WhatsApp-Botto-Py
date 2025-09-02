@@ -27,7 +27,7 @@ class Command(BaseCommand):
 
     def exec(self, M: MessageClass, _):
         try:
-            bot_name = "Aeson-Bot"
+            bot_name = "Yuito"
             version = "1.0.0"
             developer = "Salim"
             uptime = self.get_uptime()
