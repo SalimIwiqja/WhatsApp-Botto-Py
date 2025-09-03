@@ -20,8 +20,15 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
+        # ✅ Only allow dev numbers
+        if M.sender.number not in self.client.config.dev:
+            return self.client.reply_message(
+                "⚠️ *Oops!* This command is exclusively for *developers*.", M
+            )
+
         text = contex.text.strip()
         target = M.quoted_user or (M.mentioned[0] if M.mentioned else None)
+
         if not target:
             return self.client.reply_message("⚠️ Mention or quote someone to ban.", M)
 
@@ -29,12 +36,14 @@ class Command(BaseCommand):
         parts = text.split("|", 1)
         reason = parts[1].strip() if len(parts) > 1 else "No reason provided."
 
+        # Check if already banned
         user_data = self.client.db.get_user_by_number(target.number)
         if user_data and user_data.ban:
             return self.client.reply_message(
                 f"⚠️ *@{target.number.split('@')[0]}* is already *banned*.\n📝 Reason: {user_data.reason}", M
             )
 
+        # Update ban
         self.client.db.update_user_ban(target.number, True, reason)
         self.client.reply_message(
             f"🔒 *@{target.number.split('@')[0]}* has been *banned*.\n📝 *Reason:* {reason}", M
