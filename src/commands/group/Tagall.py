@@ -8,10 +8,10 @@ class Command(BaseCommand):
             {
                 "command": "tagall",
                 "category": "group",
-                "aliases": [],
+                "aliases": ["all", "everyone"],
                 "description": {
-                    "content": "Mention all group members.",
-                    "usage": "<optional message>",
+                    "content": "Tag everyone in the group.",
+                    "usage": "",
                 },
                 "exp": 0,
                 "group": True,
@@ -19,44 +19,24 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        # Get group ID and sender number
-        group_id = M.gcjid
-        sender_number = M.sender.number
+        group_metadata = self.client.get_group_metadata(M.gcjid)
+        participants = group_metadata.participants
 
-        try:
-            # Fetch group participants and admins
-            participants = self.client.get_group_participants(group_id)
-            group_admins = [adm.user for adm in self.client.get_group_admins(group_id)]
-        except Exception as e:
-            return self.client.reply_message(f"⚠️ Error fetching group info: {e}", M)
+        # Check if sender is admin
+        admins = [p.id for p in participants if p.admin]
+        if M.sender.number not in [a.split("@")[0] for a in admins]:
+            return self.client.reply_message("⚠️ Only *group admins* can use this command.", M)
 
-        # Check if sender is an admin
-        if sender_number not in group_admins:
-            return self.client.reply_message(
-                "⚠️ Only group admins can use this command.", M
-            )
+        # Build mentions
+        mentions = [p.id for p in participants if p.id != self.client.config.number]
+        if not mentions:
+            return self.client.reply_message("⚠️ No members to tag.", M)
 
-        # Optional text after the command
-        optional_text = contex.text.strip() if contex.text else ""
+        text = "📢 *Tagging everyone in the group:*\n\n"
+        text += "\n".join([f"@{m.split('@')[0]}" for m in mentions])
 
-        # Build mentions list
-        mentions = []
-        mention_texts = []
-        for member in participants:
-            mentions.append(member.user)
-            mention_texts.append(f"@{member.user.split('@')[0]}")
-
-        # Final message
-        message_to_send = (
-            optional_text + "\n\n" if optional_text else ""
-        ) + " ".join(mention_texts)
-
-        # Send message with mentions
-        try:
-            self.client.send_message(
-                group_id,
-                message_to_send,
-                mentions=mentions
-            )
-        except Exception as e:
-            self.client.reply_message(f"⚠️ Failed to tag everyone: {e}", M)
+        self.client.send_message(
+            M.gcjid,
+            text,
+            mentions=mentions,
+        )
