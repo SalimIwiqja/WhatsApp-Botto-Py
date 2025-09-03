@@ -8,37 +8,55 @@ class Command(BaseCommand):
             {
                 "command": "tagall",
                 "category": "group",
-                "aliases": ["everyone"],
+                "aliases": [],
                 "description": {
-                    "content": "Tag all group members.",
-                    "usage": "[optional message]",
+                    "content": "Mention all group members.",
+                    "usage": "<optional message>",
                 },
-                "exp": 1,
+                "exp": 0,
                 "group": True,
-                "adminOnly": True,
             },
         )
 
     def exec(self, M: MessageClass, contex):
-        if not M.sender.is_admin:
-            return self.client.reply_message("❌ You must be a group admin to use this command.", M)
+        # Get group ID and sender number
+        group_id = M.gcjid
+        sender_number = M.sender.number
 
-        members = self.client.get_group_members(M.chat)
-        if not members:
-            return self.client.reply_message("⚠️ Could not fetch group members.", M)
+        try:
+            # Fetch group participants and admins
+            participants = self.client.get_group_participants(group_id)
+            group_admins = [adm.user for adm in self.client.get_group_admins(group_id)]
+        except Exception as e:
+            return self.client.reply_message(f"⚠️ Error fetching group info: {e}", M)
 
-        message_text = contex.text.strip() if contex.text else ""
-        tagged_mentions = [f"@{m.number.split('@')[0]}" for m in members if m.number != self.client.user.number]
+        # Check if sender is an admin
+        if sender_number not in group_admins:
+            return self.client.reply_message(
+                "⚠️ Only group admins can use this command.", M
+            )
 
-        if not tagged_mentions:
-            return self.client.reply_message("⚠️ No members to tag.", M)
+        # Optional text after the command
+        optional_text = contex.text.strip() if contex.text else ""
 
-        full_message = message_text + "\n\n" + " ".join(tagged_mentions)
+        # Build mentions list
+        mentions = []
+        mention_texts = []
+        for member in participants:
+            mentions.append(member.user)
+            mention_texts.append(f"@{member.user.split('@')[0]}")
+
+        # Final message
+        message_to_send = (
+            optional_text + "\n\n" if optional_text else ""
+        ) + " ".join(mention_texts)
+
+        # Send message with mentions
         try:
             self.client.send_message(
-                M.chat,
-                full_message,
-                mentions=[m.number for m in members if m.number != self.client.user.number]
+                group_id,
+                message_to_send,
+                mentions=mentions
             )
         except Exception as e:
-            return self.client.reply_message(f"❌ Failed to tag members.\nError: {str(e)}", M)
+            self.client.reply_message(f"⚠️ Failed to tag everyone: {e}", M)
