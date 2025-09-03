@@ -33,24 +33,24 @@ class Command(BaseCommand):
                 return self.client.reply_message("❌ Command not found.", M)
 
             options = command.config
-            if M.sender.number not in self.client.config.mods and options["category"] == "dev":
+            if M.sender.number not in self.client.config.mods and options.category == "dev":
                 return self.client.reply_message("❌ Command not found.", M)
 
             desc = options.get("description", {})
             aliases = ", ".join(options.get("aliases", [])) or "No aliases"
-            usage = f"{prefix}{options['command']} {desc.get('usage', '')}".strip()
+            usage = f"{prefix}{options.command} {desc.get('usage', '')}".strip()
             content = desc.get("content", "No description available")
 
             help_text = f"""\
-🔰 *Command:* {options['command']}
+🔰 *Command:* {options.command}
 🔁 *Aliases:* {aliases}
-ℹ️ *Category:* {options['category'].capitalize()}
+ℹ️ *Category:* {options.category.capitalize()}
 ⚙️ *Usage:* {usage}
 📝 *Description:* {content}
 """
             return self.client.reply_message(help_text, M)
 
-        # Full help menu (Nexus Style)
+        # Full help menu
         final_text = f"""⛩️❯─「 *Nexus Inc* 」─❮⛩️
 
 🌸 *Konnichiwaaa* (๑>ᴗ<๑) @{M.sender.username or M.sender.number.split('@')[0]}
@@ -87,11 +87,12 @@ I'm *Yuito* ✨
 🌟 *Arigato for Choosing Nexus!* 🌟
 """
 
+        # Send image from GitHub
         image_url = "https://raw.githubusercontent.com/SalimIwiqja/WhatsApp-Botto-Py/refs/heads/main/src/Scarlet-Nexus-Anime-3.jpg"
         try:
             resp = requests.get(image_url, timeout=10)
             if resp.status_code == 200:
-                image_bytes = BytesIO(resp.content)
+                image_bytes = BytesIO(resp.content).read()  # <-- fix
                 self.client.send_image(M.gcjid, image_bytes, caption=final_text)
             else:
                 self.client.reply_message(final_text, M)
