@@ -1,6 +1,5 @@
 from libs import BaseCommand, MessageClass
 
-
 class Command(BaseCommand):
     def __init__(self, client, handler):
         super().__init__(
@@ -9,50 +8,37 @@ class Command(BaseCommand):
             {
                 "command": "tagall",
                 "category": "group",
-                "aliases": ["mentionall", "ta"],
+                "aliases": ["everyone"],
                 "description": {
-                    "content": "Mention all group members.",
-                    "usage": "<optional_text>",
+                    "content": "Tag all group members.",
+                    "usage": "[optional message]",
                 },
+                "exp": 1,
                 "group": True,
-                "admin": True,
-                "exp": 0,
+                "adminOnly": True,
             },
         )
 
     def exec(self, M: MessageClass, contex):
+        if not M.sender.is_admin:
+            return self.client.reply_message("❌ You must be a group admin to use this command.", M)
+
+        members = self.client.get_group_members(M.chat)
+        if not members:
+            return self.client.reply_message("⚠️ Could not fetch group members.", M)
+
+        message_text = contex.text.strip() if contex.text else ""
+        tagged_mentions = [f"@{m.number.split('@')[0]}" for m in members if m.number != self.client.user.number]
+
+        if not tagged_mentions:
+            return self.client.reply_message("⚠️ No members to tag.", M)
+
+        full_message = message_text + "\n\n" + " ".join(tagged_mentions)
         try:
-            participants = M.group.Participants
-            if not participants:
-                return self.client.reply_message(
-                    "⚠️ Could not fetch *participant list*.", M
-                )
-
-            mentions = []
-            tags = []
-
-            for member in participants:
-                # Skip the bot itself
-                if member.JID.User != self.client.get_me().JID.User:
-                    mentions.append(member.JID)  # full JID for actual mention
-                    tags.append(f"@{member.JID.User}")  # show number as text
-
-            prefix_text = (
-                contex.text.strip()
-                if contex.text
-                else "📢 *Attention everyone!*"
-            )
-            message = f"{prefix_text}\n\n" + " ".join(tags)
-
-            # Send message with proper mentions
             self.client.send_message(
-                M.gcjid,
-                message,
-                mentions=mentions
+                M.chat,
+                full_message,
+                mentions=[m.number for m in members if m.number != self.client.user.number]
             )
-
         except Exception as e:
-            self.client.reply_message(
-                "❌ An error occurred while tagging everyone.", M
-            )
-            self.client.log.error(f"[TagAllError] {e}")
+            return self.client.reply_message(f"❌ Failed to tag members.\nError: {str(e)}", M)
