@@ -20,8 +20,10 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        user_number = M.sender.number
-        # check if sender is dev or mod
+        # Normalize sender number
+        user_number = M.sender.number.split("@")[0]
+
+        # Check if sender is dev or mod
         if user_number not in self.client.config.dev and user_number not in self.client.config.mods:
             return self.client.reply_message("⚠️ You don't have permission to use this command.", M)
 
@@ -30,16 +32,20 @@ class Command(BaseCommand):
         if not target:
             return self.client.reply_message("⚠️ Mention or quote someone to ban.", M)
 
+        # Normalize target number
+        target_number = str(target.number).split("@")[0]
+
+        # Split reason
         parts = text.split("|", 1)
         reason = parts[1].strip() if len(parts) > 1 else "No reason provided."
 
-        user_data = self.client.db.get_user_by_number(target.number)
-        if user_data and user_data.ban:
+        user_data = self.client.db.get_user_by_number(target_number)
+        if user_data and getattr(user_data, "ban", False):
             return self.client.reply_message(
-                f"⚠️ *@{target.number.split('@')[0]}* is already banned.\n📝 Reason: {user_data.reason}", M
+                f"⚠️ *@{target_number}* is already banned.\n📝 Reason: {getattr(user_data, 'reason', 'No reason')}", M
             )
 
-        self.client.db.update_user_ban(target.number, True, reason)
+        self.client.db.update_user_ban(target_number, True, reason)
         self.client.reply_message(
-            f"🔒 *@{target.number.split('@')[0]}* has been banned.\n📝 Reason: {reason}", M
+            f"🔒 *@{target_number}* has been banned.\n📝 Reason: {reason}", M
         )
