@@ -7,25 +7,23 @@ class Command(BaseCommand):
             handler,
             {
                 "command": "unban",
-                "category": "dev",
+                "category": "group",
                 "aliases": [],
                 "description": {
                     "content": "Unban a previously banned user.",
-                    "usage": "<@mention> | <quote>",
+                    "usage": "<@mention> or <quote>",
                 },
                 "exp": 0,
                 "group": True,
-                "devOnly": False,  # Allow mods too
+                "devOnly": False,  # allow mods too
             },
         )
 
     def exec(self, M: MessageClass, contex):
-        sender = M.sender.number.split('@')[0]
-        allowed = [n.split('@')[0] for n in self.client.config.dev + self.client.config.mods]
-        if sender not in allowed:
-            return self.client.reply_message(
-                "⚠️ You don't have permission to use this command.", M
-            )
+        user_number = M.sender.number
+        # check if sender is dev or mod
+        if user_number not in self.client.config.dev and user_number not in self.client.config.mods:
+            return self.client.reply_message("⚠️ You don't have permission to use this command.", M)
 
         target = M.quoted_user or (M.mentioned[0] if M.mentioned else None)
         if not target:
@@ -33,7 +31,7 @@ class Command(BaseCommand):
 
         user_data = self.client.db.get_user_by_number(target.number)
         if not user_data or not user_data.ban:
-            return self.client.reply_message(f"ℹ️ *@{target.number.split('@')[0]}* is *not banned*.", M)
+            return self.client.reply_message(f"ℹ️ *@{target.number.split('@')[0]}* is not banned.", M)
 
         self.client.db.update_user_ban(target.number, False, "No ban")
-        self.client.reply_message(f"🔓 *@{target.number.split('@')[0]}* has been *unbanned*.", M)
+        self.client.reply_message(f"🔓 *@{target.number.split('@')[0]}* has been unbanned.", M)
