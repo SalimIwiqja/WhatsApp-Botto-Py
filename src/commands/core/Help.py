@@ -24,7 +24,7 @@ class Command(BaseCommand):
         query = contex.text.strip().lower() if contex.text else None
 
         if query:
-            # Single command help (keep old behavior)
+            # Single command help
             command = self.handler.commands.get(query) or next(
                 (cmd for cmd in self.handler.commands.values() if query in cmd.config.get("aliases", [])),
                 None,
@@ -33,25 +33,25 @@ class Command(BaseCommand):
                 return self.client.reply_message("❌ Command not found.", M)
 
             options = command.config
-            if M.sender.number not in self.client.config.mods and options.category == "dev":
+            if M.sender.number not in self.client.config.mods and options["category"] == "dev":
                 return self.client.reply_message("❌ Command not found.", M)
 
             desc = options.get("description", {})
             aliases = ", ".join(options.get("aliases", [])) or "No aliases"
-            usage = f"{prefix}{options.command} {desc.get('usage', '')}".strip()
+            usage = f"{prefix}{options['command']} {desc.get('usage', '')}".strip()
             content = desc.get("content", "No description available")
 
             help_text = f"""\
-🔰 *Command:* {options.command}
+🔰 *Command:* {options['command']}
 🔁 *Aliases:* {aliases}
-ℹ️ *Category:* {options.category.capitalize()}
+ℹ️ *Category:* {options['category'].capitalize()}
 ⚙️ *Usage:* {usage}
 📝 *Description:* {content}
 """
             return self.client.reply_message(help_text, M)
 
         # Full help menu (Nexus Style)
-        help_text = f"""⛩️❯─「 *Nexus Inc* 」─❮⛩️
+        final_text = f"""⛩️❯─「 *Nexus Inc* 」─❮⛩️
 
 🌸 *Konnichiwaaa* (๑>ᴗ<๑) @{M.sender.username or M.sender.number.split('@')[0]}
 I'm *Yuito* ✨
@@ -87,15 +87,14 @@ I'm *Yuito* ✨
 🌟 *Arigato for Choosing Nexus!* 🌟
 """
 
-        # Catbox banner image
         image_url = "https://raw.githubusercontent.com/SalimIwiqja/WhatsApp-Botto-Py/refs/heads/main/src/Scarlet-Nexus-Anime-3.jpg"
-try:
-    resp = requests.get(image_url, timeout=10)
-    if resp.status_code == 200:
-        image_bytes = BytesIO(resp.content)
-        self.client.send_image(M.gcjid, image_bytes, caption=final_text)
-    else:
-        self.client.reply_message(final_text, M)
-except Exception as e:
-    self.client.log.error(f"[HelpImageError] {e}")
-    self.client.reply_message(final_text, M)
+        try:
+            resp = requests.get(image_url, timeout=10)
+            if resp.status_code == 200:
+                image_bytes = BytesIO(resp.content)
+                self.client.send_image(M.gcjid, image_bytes, caption=final_text)
+            else:
+                self.client.reply_message(final_text, M)
+        except Exception as e:
+            self.client.log.error(f"[HelpImageError] {e}")
+            self.client.reply_message(final_text, M)
