@@ -88,14 +88,14 @@ I'm *Yuito* ✨
 """
 
         # Catbox banner image
-        image_url = "https://files.catbox.moe/qjtp8v.jpg"
-        try:
-            resp = requests.get(image_url)
-            if resp.status_code == 200:
-                image_bytes = BytesIO(resp.content)
-                self.client.send_image(M.gcjid, image_bytes, caption=help_text)
-            else:
-                self.client.reply_message(help_text, M)
-        except Exception as e:
-            self.client.log.error(f"[HelpImageError] {e}")
-            self.client.reply_message(help_text, M)
+        image_url = "https://raw.githubusercontent.com/SalimIwiqja/WhatsApp-Botto-Py/refs/heads/main/src/Scarlet-Nexus-Anime-3.jpg"
+try:
+    resp = requests.get(image_url, timeout=10)
+    if resp.status_code == 200:
+        image_bytes = BytesIO(resp.content)
+        self.client.send_image(M.gcjid, image_bytes, caption=final_text)
+    else:
+        self.client.reply_message(final_text, M)
+except Exception as e:
+    self.client.log.error(f"[HelpImageError] {e}")
+    self.client.reply_message(final_text, M)
