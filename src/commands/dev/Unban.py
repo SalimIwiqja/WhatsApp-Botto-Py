@@ -20,10 +20,10 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        # ✅ Only allow dev numbers
-        if M.sender.number not in self.client.config.dev:
+        # Permission check: dev OR mod
+        if M.sender.number not in self.client.config.dev and M.sender.number not in self.client.config.mods:
             return self.client.reply_message(
-                "⚠️ *Oops!* This command is exclusively for *developers*.", M
+                "⚠️ *Oops!* Some of these commands are *exclusively for developers or moderators*.", M
             )
 
         target = M.quoted_user or (M.mentioned[0] if M.mentioned else None)
@@ -32,11 +32,7 @@ class Command(BaseCommand):
 
         user_data = self.client.db.get_user_by_number(target.number)
         if not user_data or not user_data.ban:
-            return self.client.reply_message(
-                f"ℹ️ *@{target.number.split('@')[0]}* is *not banned*.", M
-            )
+            return self.client.reply_message(f"ℹ️ *@{target.number.split('@')[0]}* is *not banned*.", M)
 
         self.client.db.update_user_ban(target.number, False, "No ban")
-        self.client.reply_message(
-            f"🔓 *@{target.number.split('@')[0]}* has been *unbanned*.", M
-        )
+        self.client.reply_message(f"🔓 *@{target.number.split('@')[0]}* has been *unbanned*.", M)
