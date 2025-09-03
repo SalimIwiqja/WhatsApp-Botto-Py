@@ -20,8 +20,10 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        user_number = M.sender.number
-        # check if sender is dev or mod
+        # Normalize sender number
+        user_number = M.sender.number.split("@")[0]
+
+        # Check if sender is dev or mod
         if user_number not in self.client.config.dev and user_number not in self.client.config.mods:
             return self.client.reply_message("⚠️ You don't have permission to use this command.", M)
 
@@ -29,9 +31,12 @@ class Command(BaseCommand):
         if not target:
             return self.client.reply_message("⚠️ Mention or quote someone to unban.", M)
 
-        user_data = self.client.db.get_user_by_number(target.number)
-        if not user_data or not user_data.ban:
-            return self.client.reply_message(f"ℹ️ *@{target.number.split('@')[0]}* is not banned.", M)
+        # Normalize target number
+        target_number = str(target.number).split("@")[0]
 
-        self.client.db.update_user_ban(target.number, False, "No ban")
-        self.client.reply_message(f"🔓 *@{target.number.split('@')[0]}* has been unbanned.", M)
+        user_data = self.client.db.get_user_by_number(target_number)
+        if not user_data or not getattr(user_data, "ban", False):
+            return self.client.reply_message(f"ℹ️ *@{target_number}* is not banned.", M)
+
+        self.client.db.update_user_ban(target_number, False, "No ban")
+        self.client.reply_message(f"🔓 *@{target_number}* has been unbanned.", M)
