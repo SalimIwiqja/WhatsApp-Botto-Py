@@ -19,34 +19,32 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        # Fetch group info from DB
-        group = self.client.db.get_group_by_number(M.gcjid)
-        if not group:
-            return self.client.reply_message("⚠️ Failed to get group info.", M)
+        # Fetch group from database safely
+        try:
+            group = self.client.db.get_group_by_number(str(M.gcjid))
+        except Exception as e:
+            return self.client.reply_message(f"⚠️ Failed to get group info: {e}", M)
 
-        participants = getattr(group, "participants", [])
-        admins = getattr(group, "admins", [])
-
-        if not participants:
-            return self.client.reply_message("⚠️ No participants found.", M)
+        if not group or not getattr(group, "participants", None):
+            return self.client.reply_message("⚠️ No participants found in the group.", M)
 
         # Check if sender is admin
-        if M.sender.number not in admins and M.sender.number != self.client.config.number:
-            return self.client.reply_message("⚠️ Only *group admins* can use this command.", M)
+        admins = [str(p.id) for p in group.participants if getattr(p, "admin", False)]
+        if str(M.sender.number) not in admins:
+            return self.client.reply_message("⚠️ Only group admins can use this command.", M)
 
-        # Build mentions text
-        mentions = []
-        text_lines = ["📢 *Tagging everyone in the group:*"]
-        for p in participants:
-            if p != self.client.config.number:  # skip bot itself
-                mentions.append(p)
-                text_lines.append(f"@{p.split('@')[0]}")
+        # Build mentions list (exclude bot itself)
+        mentions = [str(p.id) for p in group.participants if str(p.id) != self.client.config.number]
+        if not mentions:
+            return self.client.reply_message("⚠️ No members to tag.", M)
 
-        text = "\n".join(text_lines)
+        # Construct text with mentions
+        text = "📢 *Tagging everyone in the group:*\n\n"
+        text += "\n".join([f"@{m.split('@')[0]}" for m in mentions])
 
-        # Send the message with mentions
+        # Send message with mentions
         self.client.send_message(
-            M.gcjid,
+            str(M.gcjid),
             text,
-            mentions=mentions
+            mentions=mentions,
         )
