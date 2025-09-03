@@ -7,7 +7,7 @@ class Command(BaseCommand):
             handler,
             {
                 "command": "ban",
-                "category": "dev",
+                "category": "group",
                 "aliases": [],
                 "description": {
                     "content": "Ban a user from using the bot.",
@@ -15,32 +15,31 @@ class Command(BaseCommand):
                 },
                 "exp": 0,
                 "group": True,
-                "devOnly": False,  # Allow mods too
+                "devOnly": False,  # allow mods too
             },
         )
 
     def exec(self, M: MessageClass, contex):
-        sender = M.sender.number.split('@')[0]
-        allowed = [n.split('@')[0] for n in self.client.config.dev + self.client.config.mods]
-        if sender not in allowed:
-            return self.client.reply_message(
-                "⚠️ You don't have permission to use this command.", M
-            )
+        user_number = M.sender.number
+        # check if sender is dev or mod
+        if user_number not in self.client.config.dev and user_number not in self.client.config.mods:
+            return self.client.reply_message("⚠️ You don't have permission to use this command.", M)
 
+        text = contex.text.strip()
         target = M.quoted_user or (M.mentioned[0] if M.mentioned else None)
         if not target:
             return self.client.reply_message("⚠️ Mention or quote someone to ban.", M)
 
-        parts = contex.text.strip().split("|", 1)
+        parts = text.split("|", 1)
         reason = parts[1].strip() if len(parts) > 1 else "No reason provided."
 
         user_data = self.client.db.get_user_by_number(target.number)
         if user_data and user_data.ban:
             return self.client.reply_message(
-                f"⚠️ *@{target.number.split('@')[0]}* is already *banned*.\n📝 Reason: {user_data.reason}", M
+                f"⚠️ *@{target.number.split('@')[0]}* is already banned.\n📝 Reason: {user_data.reason}", M
             )
 
         self.client.db.update_user_ban(target.number, True, reason)
         self.client.reply_message(
-            f"🔒 *@{target.number.split('@')[0]}* has been *banned*.\n📝 Reason: {reason}", M
+            f"🔒 *@{target.number.split('@')[0]}* has been banned.\n📝 Reason: {reason}", M
         )
