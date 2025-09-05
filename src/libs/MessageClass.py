@@ -3,13 +3,9 @@ from libs import Void
 from utils import DynamicConfig
 
 def jid_to_number(jid: str) -> str:
-    """
-    Converts WhatsApp JID to a proper phone number with +countrycode
-    """
     if "@" in jid:
         number = jid.split("@")[0]
         if not number.startswith("+"):
-            # Adjust for your country if needed
             number = f"+{number}"
         return number
     return jid
@@ -25,16 +21,18 @@ class MessageClass:
         self.gcjid = self.Info.MessageSource.Chat
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
-        # convert JID to proper phone number
         sender_jid = self.Info.MessageSource.Sender.User
-        self.sender = DynamicConfig(
-            {
-                "number": jid_to_number(sender_jid),
-                "username": client.contact.get_contact(sender_jid).PushName
-                if hasattr(client.contact.get_contact(sender_jid), "PushName")
-                else "Unknown",
-            }
-        )
+        sender_number = jid_to_number(sender_jid)
+        sender_username = "Unknown"
+
+        try:
+            contact = client.contact.get_contact(sender_jid)
+            if hasattr(contact, "PushName"):
+                sender_username = contact.PushName
+        except Exception:
+            sender_username = "Unknown"
+
+        self.sender = DynamicConfig({"number": sender_number, "username": sender_username})
 
         self.urls = []
         self.numbers = []
@@ -51,33 +49,32 @@ class MessageClass:
 
                 if ctx_info.HasField("participant"):
                     quoted_number = jid_to_number(ctx_info.participant)
+                    quoted_username = "Unknown"
+                    try:
+                        contact = client.contact.get_contact(ctx_info.participant)
+                        if hasattr(contact, "PushName"):
+                            quoted_username = contact.PushName
+                    except Exception:
+                        quoted_username = "Unknown"
                     self.quoted_user = DynamicConfig(
-                        {
-                            "number": quoted_number,
-                            "username": client.contact.get_contact(
-                                ctx_info.participant
-                            ).PushName
-                            if hasattr(client.contact.get_contact(ctx_info.participant), "PushName")
-                            else "Unknown",
-                        }
+                        {"number": quoted_number, "username": quoted_username}
                     )
 
             # handle mentioned JIDs
             for jid in ctx_info.mentionedJID:
                 number = jid_to_number(jid)
+                mention_username = "Unknown"
+                try:
+                    contact = client.contact.get_contact(jid)
+                    if hasattr(contact, "PushName"):
+                        mention_username = contact.PushName
+                except Exception:
+                    mention_username = "Unknown"
                 self.mentioned.append(
-                    DynamicConfig(
-                        {
-                            "number": number,
-                            "username": client.contact.get_contact(jid).PushName
-                            if hasattr(client.contact.get_contact(jid), "PushName")
-                            else "Unknown",
-                        }
-                    )
+                    DynamicConfig({"number": number, "username": mention_username})
                 )
 
     def build(self):
-        # extract URLs and numbers
         self.urls = self.__client.utils.get_urls(self.content)
         self.numbers = [
             str(n) if isinstance(n, int) else n
@@ -89,7 +86,6 @@ class MessageClass:
                 self.sender.number
                 in self.__client.filter_admin_users(self.group.Participants)
             )
-
         return self
 
     def raw(self):
