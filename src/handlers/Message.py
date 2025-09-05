@@ -27,11 +27,11 @@ class Message:
             command = contex.cmd
             arg_count = len(contex.args) - 1
             self.__client.log.info(
-                f"{chat_type} {self.__client.config.prefix}{command}[{arg_count}] from {M.sender.username} in {chat_name} at {timestamp}"
+                f"{chat_type} {self.__client.config.prefix}{command}[{arg_count}] from {M.sender.username} ({M.sender.number}) in {chat_name} at {timestamp}"
             )
         else:
             return self.__client.log.info(
-                f"{chat_type} from {M.sender.username} in {chat_name} at {timestamp}"
+                f"{chat_type} from {M.sender.username} ({M.sender.number}) in {chat_name} at {timestamp}"
             )
 
         if M.content == self.__client.config.prefix:
@@ -55,129 +55,91 @@ class Message:
                 M,
             )
 
-        user: User = self.__client.db.get_user_by_number(M.sender.number)
+        # Always store numbers in full format with +
+        sender_number = M.sender.number
+        if not sender_number.startswith("+"):
+            sender_number = f"+{sender_number}"
+
+        user: User = self.__client.db.get_user_by_number(sender_number)
         command_info: Command = self.__client.db.get_cmd_info(
             cmd.config.command
         )
 
         if user.ban:
             return self.__client.reply_message(
-                f"🚫 *Oops!* It looks like you are *banned* from using this bot.\n📝 *Reason:* {user.reason}\n🕒 *Banned at:* {user.banned_at.strftime('%Y-%m-%d %H:%M:%S (%z)')}\n\nIf you believe this is a mistake, please contact the admin. 🤖",
+                f"🚫 *Oops!* You are *banned*.\n📝 Reason: {user.reason}\n🕒 Banned at: {user.banned_at.strftime('%Y-%m-%d %H:%M:%S')}",
                 M,
             )
 
         if not command_info.enable:
             return self.__client.reply_message(
-                f"🚫 Sorry! The command *{cmd.config.command}* is currently disabled.\n\n"
-                f"*Banned at:* {command_info.created_at.strftime('%Y-%m-%d %H:%M:%S (%z)')}\n"
-                f"*Reason:* {command_info.reason}\n\n"
-                "If you think this is a mistake, please contact the admin. 🤖",
+                f"🚫 Command *{cmd.config.command}* is disabled.\n📝 Reason: {command_info.reason}",
                 M,
             )
 
         if getattr(cmd.config, "group", False) and M.chat == "dm":
             return self.__client.reply_message(
-                "👥 These commands are *group-only*, please try them inside a group.",
-                M,
+                "👥 This command is *group-only*.", M
             )
 
         if getattr(cmd.config, "dm", False) and M.chat == "group":
             return self.__client.reply_message(
-                "💬 Please use this command in *private chat* only.", M
+                "💬 Use this command in *private chat*.", M
             )
 
-        if (
-            getattr(cmd.config, "devOnly", False)
-            and M.sender.number not in self.__client.config.mods
-        ):
+        # Correct dev/mod check with full number
+        if getattr(cmd.config, "devOnly", False) and sender_number not in self.__client.config.mods + self.__client.config.dev:
             return self.__client.reply_message(
-                "⚠️ *Oops!* Some of these commands are *exclusively for developers*.",
-                M,
+                "⚠️ *Oops!* You are not allowed to use this command.", M
             )
 
         if getattr(cmd.config, "admin", False) and not M.isAdminMessage:
-            if (
-                self.__client.get_me().JID.User
-                not in self.__client.filter_admin_users(M.group.Participants)
-            ):
+            bot_number = self.__client.get_me().JID.User
+            if bot_number not in self.__client.filter_admin_users(M.group.Participants):
                 return self.__client.reply_message(
-                    "🤖 The *bot must be an admin* to execute these commands properly.",
-                    M,
+                    "🤖 Bot must be an admin to execute this command.", M
                 )
             return self.__client.reply_message(
-                "🚫 *Sorry!* You don’t have the required permissions to use this command. Kindly become an *admin* first.",
-                M,
+                "🚫 You don’t have admin permissions.", M
             )
 
-        # Add EXP and check rank up
-        self.__client.db.add_exp(M.sender.number, cmd.config.exp)
+        # Add EXP and check rank
+        self.__client.db.add_exp(sender_number, cmd.config.exp)
         new_exp = user.exp + cmd.config.exp
-
         old_rank = get_rank(user.exp)
         new_rank = get_rank(new_exp)
-
         if old_rank["name"] != new_rank["name"]:
             self.__client.reply_message(
-                f"🎉 *Congratulations*! {M.sender.username} has ranked up from *{old_rank['name']} {old_rank['data']['emoji']}* "
-                f"to *{new_rank['name']} {new_rank['data']['emoji']}*",
+                f"🎉 *{M.sender.username}* ranked up from *{old_rank['name']}* to *{new_rank['name']}*!",
                 M,
             )
 
         cmd.exec(M, contex)
 
     def wa_link_detector(self, M: MessageClass):
-        group = self.__client.db.get_group_by_number(M.gcjid.User)
-
-        if not group.mod:
+        if M.chat != "group":
             return
+
+        group = self.__client.get_group_info(M.gcjid)
+        admins = self.__client.filter_admin_users(group.Participants)
         pattern = re.compile(r"https://chat\.whatsapp\.com/\S+", re.IGNORECASE)
-        admins = self.__client.filter_admin_users(M.group.Participants)
 
-        if not M.isAdminMessage:
-            for url in M.urls:
-                if pattern.search(url):
-                    try:
-                        link_info = self.__client.get_group_info_from_link(
-                            url.split("?")[0]
-                        )
-                        if link_info.GroupName.Name != M.group.GroupName.Name:
-                            if self.__client.get_me().JID.User in admins:
-                                from neonize.utils import ParticipantChange
-
-                                self.__client.update_group_participants(
-                                    M.gcjid,
-                                    [self.__client.build_jid(M.sender.number)],
-                                    ParticipantChange.REMOVE,
-                                )
-
-                            mentions = [f"@{admin}" for admin in admins]
-                            text = (
-                                "🚫 A *suspicious group link* was detected in the chat.\n\n"
-                                + " ".join(mentions)
-                            )
-
-                            self.__client.send_message(M.gcjid, text)
-
-                    except Exception as e:
-                        self.__client.log.error(f"[WA_LINK_DETECTOR] {e}")
+        for url in M.urls:
+            if pattern.search(url) and not M.isAdminMessage:
+                mentions = [f"@{admin}" for admin in admins]
+                text = f"🚫 Suspicious link detected!\n{' '.join(mentions)}"
+                self.__client.send_message(M.gcjid, text)
 
     def load_commands(self, folder_path):
         self.__client.log.info("Loading commands...")
-
         all_files = self.__client.utils.readdir_recursive(folder_path)
 
         for file_path in all_files:
-            if not file_path.endswith(".py") or os.path.basename(
-                file_path
-            ).startswith("_"):
+            if not file_path.endswith(".py") or os.path.basename(file_path).startswith("_"):
                 continue
-
             try:
                 module_name = os.path.splitext(os.path.basename(file_path))[0]
-
-                spec = importlib.util.spec_from_file_location(
-                    module_name, file_path
-                )
+                spec = importlib.util.spec_from_file_location(module_name, file_path)
                 if not spec or not spec.loader:
                     raise ImportError(f"Cannot load spec for {file_path}")
 
@@ -186,46 +148,26 @@ class Message:
 
                 CommandClass = getattr(module, "Command", None)
                 if not CommandClass:
-                    raise AttributeError(
-                        f"No class 'Command' found in {file_path}"
-                    )
+                    raise AttributeError(f"No class 'Command' in {file_path}")
 
                 command_instance = CommandClass(self.__client, self)
-                command_id = command_instance.config.command
-                self.commands[command_id] = command_instance
-
-                self.__client.log.info(
-                    f"✅ Loaded: {command_id} from {command_instance.config.get('category', 'Uncategorized')}"
-                )
+                self.commands[command_instance.config.command] = command_instance
+                self.__client.log.info(f"✅ Loaded: {command_instance.config.command}")
 
             except Exception as e:
                 self.__client.log.error(f"❌ Failed to load {file_path}: {e}")
 
-        self.__client.log.info(
-            f"✅ Successfully loaded {len(self.commands)} commands."
-        )
+        self.__client.log.info(f"✅ Loaded {len(self.commands)} commands.")
 
     def parse_args(self, raw):
         args = raw.split(" ")
-        cmd = (
-            args.pop(0).lower()[len(self.__client.config.prefix) :]
-            if args
-            else ""
-        )
+        cmd = args.pop(0).lower()[len(self.__client.config.prefix):] if args else ""
         text = " ".join(args)
         flags = {}
-
         for arg in args:
             if arg.startswith("--") and "=" in arg:
                 key, value = arg[2:].split("=", 1)
                 flags[key] = value
             elif arg.startswith("-"):
                 flags[arg] = ""
-
-        return {
-            "cmd": cmd,
-            "text": text,
-            "flags": flags,
-            "args": args,
-            "raw": raw,
-        }
+        return {"cmd": cmd, "text": text, "flags": flags, "args": args, "raw": raw}
