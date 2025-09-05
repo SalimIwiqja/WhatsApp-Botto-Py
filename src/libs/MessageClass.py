@@ -3,17 +3,14 @@ from libs import Void
 from utils import DynamicConfig
 from neonize.events import MessageEv
 
-
 def clean_number(number):
-    """Normalize WhatsApp numbers to plain digits with +"""
-    if not number:
-        return ""
-    number = str(number)
+    """Ensure the number is a string in international format, e.g., +212…"""
+    if isinstance(number, int):
+        number = str(number)
     number = re.sub(r"[^\d+]", "", number)
     if not number.startswith("+"):
-        number = "+" + number.lstrip("0")
+        number = "+" + number
     return number
-
 
 class MessageClass:
     def __init__(self, client: Void, message: MessageEv):
@@ -26,19 +23,19 @@ class MessageClass:
         self.gcjid = self.Info.MessageSource.Chat
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
+        # Extract real sender number
         raw_sender = self.Info.MessageSource.Sender.User
-        sender_jid = clean_number(raw_sender)
-
-        try:
-            contact = client.contact.get_contact(sender_jid)
-            self.sender = DynamicConfig(
-                {
-                    "number": sender_jid,
-                    "username": getattr(contact, "PushName", "Unknown"),
-                }
-            )
-        except Exception:
-            self.sender = DynamicConfig({"number": sender_jid, "username": "Unknown"})
+        self.sender_number = clean_number(raw_sender)
+        self.sender = DynamicConfig(
+            {
+                "number": self.sender_number,
+                "username": getattr(
+                    client.contact.get_contact(self.sender_number), 
+                    "PushName", 
+                    "Unknown"
+                ),
+            }
+        )
 
         self.urls = []
         self.numbers = []
@@ -51,39 +48,38 @@ class MessageClass:
 
             if ctx_info.HasField("quotedMessage"):
                 self.quoted = ctx_info.quotedMessage
+
                 if ctx_info.HasField("participant"):
                     quoted_number = clean_number(ctx_info.participant.split("@")[0])
-                    try:
-                        contact = client.contact.get_contact(quoted_number)
-                        self.quoted_user = DynamicConfig(
-                            {
-                                "number": quoted_number,
-                                "username": getattr(contact, "PushName", "Unknown"),
-                            }
-                        )
-                    except Exception:
-                        self.quoted_user = DynamicConfig(
-                            {"number": quoted_number, "username": "Unknown"}
-                        )
+                    self.quoted_user = DynamicConfig(
+                        {
+                            "number": quoted_number,
+                            "username": getattr(
+                                client.contact.get_contact(quoted_number),
+                                "PushName",
+                                "Unknown",
+                            ),
+                        }
+                    )
 
-            for jid in getattr(ctx_info, "mentionedJID", []):
+            for jid in ctx_info.mentionedJID:
                 number = clean_number(jid.split("@")[0])
-                try:
-                    contact = client.contact.get_contact(number)
-                    self.mentioned.append(
-                        DynamicConfig(
-                            {"number": number, "username": getattr(contact, "PushName", "Unknown")}
-                        )
+                self.mentioned.append(
+                    DynamicConfig(
+                        {
+                            "number": number,
+                            "username": getattr(
+                                client.contact.get_contact(number),
+                                "PushName",
+                                "Unknown",
+                            ),
+                        }
                     )
-                except Exception:
-                    self.mentioned.append(
-                        DynamicConfig({"number": number, "username": "Unknown"})
-                    )
+                )
 
     def build(self):
         self.urls = self.__client.utils.get_urls(self.content)
-        raw_numbers = self.__client.utils.extract_numbers(self.content)
-        self.numbers = [clean_number(n) for n in raw_numbers if n]
+        self.numbers = [clean_number(n) for n in self.__client.utils.extract_numbers(self.content)]
 
         if self.chat == "group":
             self.group = self.__client.get_group_info(self.gcjid)
