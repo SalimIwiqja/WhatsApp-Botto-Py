@@ -4,12 +4,8 @@ from utils import DynamicConfig
 from neonize.events import MessageEv
 
 def clean_number(number):
-    # Ensure everything is a string
-    number_str = str(number)
-    # Keep only digits, allow leading +
-    if number_str.startswith("+"):
-        return "+" + re.sub(r"[^\d]", "", number_str[1:])
-    return "+" + re.sub(r"[^\d]", "", number_str)
+    """Ensure number is a string and remove any non-digit/non-plus characters."""
+    return re.sub(r"[^\d+]", "", str(number))
 
 class MessageClass:
     def __init__(self, client: Void, message: MessageEv):
@@ -22,11 +18,16 @@ class MessageClass:
         self.gcjid = self.Info.MessageSource.Chat
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
-        # Always read sender number from metadata and clean it
-        sender_jid = str(self.Info.MessageSource.Sender.User)
+        sender_number = clean_number(self.Info.MessageSource.Sender.User)
+        try:
+            contact = client.contact.get_contact(sender_number)
+            username = getattr(contact, "PushName", str(sender_number))
+        except Exception:
+            username = str(sender_number)
+
         self.sender = DynamicConfig({
-            "number": "+" + sender_jid if not sender_jid.startswith("+") else sender_jid,
-            "username": client.contact.get_contact(sender_jid).PushName,
+            "number": sender_number,
+            "username": username,
         })
 
         self.urls = []
@@ -35,7 +36,7 @@ class MessageClass:
         self.quoted_user = None
         self.mentioned = []
 
-        # Handle quoted messages
+        # Quoted message handling
         if self.Message.HasField("extendedTextMessage"):
             ctx_info = self.Message.extendedTextMessage.contextInfo
 
@@ -43,34 +44,45 @@ class MessageClass:
                 self.quoted = ctx_info.quotedMessage
 
                 if ctx_info.HasField("participant"):
-                    quoted_number = str(ctx_info.participant)
-                    if not quoted_number.startswith("+"):
-                        quoted_number = "+" + quoted_number
+                    quoted_number = clean_number(ctx_info.participant)
+                    try:
+                        quoted_contact = client.contact.get_contact(quoted_number)
+                        quoted_username = getattr(quoted_contact, "PushName", quoted_number)
+                    except Exception:
+                        quoted_username = quoted_number
+
                     self.quoted_user = DynamicConfig({
                         "number": quoted_number,
-                        "username": client.contact.get_contact(quoted_number).PushName,
+                        "username": quoted_username,
                     })
 
-            # Handle mentions
+            # Mentioned users
             for jid in ctx_info.mentionedJID:
-                mention_number = str(jid)
-                if not mention_number.startswith("+"):
-                    mention_number = "+" + mention_number
+                number = clean_number(jid)
+                try:
+                    contact = client.contact.get_contact(number)
+                    username = getattr(contact, "PushName", number)
+                except Exception:
+                    username = number
+
                 self.mentioned.append(DynamicConfig({
-                    "number": mention_number,
-                    "username": client.contact.get_contact(mention_number).PushName,
+                    "number": number,
+                    "username": username,
                 }))
 
     def build(self):
-        # Extract URLs
+        # Extract URLs and numbers
         self.urls = self.__client.utils.get_urls(self.content)
-        # Extract numbers and clean them
         self.numbers = [clean_number(n) for n in self.__client.utils.extract_numbers(self.content)]
 
         # Group info
         if self.chat == "group":
-            self.group = self.__client.get_group_info(self.gcjid)
-            self.isAdminMessage = self.sender.number in self.__client.filter_admin_users(self.group.Participants)
+            try:
+                self.group = self.__client.get_group_info(self.gcjid)
+                self.isAdminMessage = self.sender.number in self.__client.filter_admin_users(self.group.Participants)
+            except Exception:
+                self.group = None
+                self.isAdminMessage = False
 
         return self
 
