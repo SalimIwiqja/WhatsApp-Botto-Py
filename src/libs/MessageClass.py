@@ -3,6 +3,16 @@ from utils import DynamicConfig
 from neonize.events import MessageEv
 
 
+def normalize_number(number: str) -> str:
+    """
+    Ensure all numbers are in full international format.
+    Adjust the default country code (+212) if needed.
+    """
+    if not number.startswith("+"):
+        number = "+212" + number.lstrip("0")
+    return number
+
+
 class MessageClass:
     def __init__(self, client: Void, message: MessageEv):
         self.__client = client
@@ -15,17 +25,12 @@ class MessageClass:
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
         sender_jid = self.Info.MessageSource.Sender.User
-        # Safely get sender username
-        try:
-            contact = client.contact.get_contact(sender_jid)
-            username = getattr(contact, "PushName", sender_jid)
-        except Exception:
-            username = sender_jid
-
         self.sender = DynamicConfig(
             {
-                "number": sender_jid,
-                "username": username,
+                "number": normalize_number(sender_jid),
+                "username": client.contact.get_contact(
+                    client.build_jid(sender_jid)
+                ).PushName,
             }
         )
 
@@ -38,38 +43,30 @@ class MessageClass:
         if self.Message.HasField("extendedTextMessage"):
             ctx_info = self.Message.extendedTextMessage.contextInfo
 
+            # Quoted user
             if ctx_info.HasField("quotedMessage"):
                 self.quoted = ctx_info.quotedMessage
-
                 if ctx_info.HasField("participant"):
-                    quoted_number = ctx_info.participant.split("@")[0]
-                    try:
-                        quoted_contact = client.contact.get_contact(quoted_number)
-                        quoted_username = getattr(quoted_contact, "PushName", quoted_number)
-                    except Exception:
-                        quoted_username = quoted_number
-
+                    quoted_number = normalize_number(ctx_info.participant.split("@")[0])
                     self.quoted_user = DynamicConfig(
                         {
                             "number": quoted_number,
-                            "username": quoted_username,
+                            "username": client.contact.get_contact(
+                                client.build_jid(quoted_number)
+                            ).PushName,
                         }
                     )
 
-            # Handle mentioned users safely
+            # Mentioned users
             for jid in ctx_info.mentionedJID:
-                number = jid.split("@")[0]
-                try:
-                    contact = client.contact.get_contact(number)
-                    username = getattr(contact, "PushName", number)
-                except Exception:
-                    username = number
-
+                number = normalize_number(jid.split("@")[0])
                 self.mentioned.append(
                     DynamicConfig(
                         {
                             "number": number,
-                            "username": username,
+                            "username": client.contact.get_contact(
+                                client.build_jid(number)
+                            ).PushName,
                         }
                     )
                 )
@@ -79,19 +76,17 @@ class MessageClass:
         self.numbers = self.__client.utils.extract_numbers(self.content)
 
         if self.chat == "group":
-            try:
-                self.group = self.__client.get_group_info(self.gcjid)
-            except Exception:
-                self.group = None
-
+            self.group = self.__client.get_group_info(self.gcjid)
             self.isAdminMessage = (
                 self.sender.number
                 in self.__client.filter_admin_users(self.group.Participants)
-                if self.group
-                else False
             )
 
         return self
+
+    @property
+    def is_group(self):
+        return self.chat == "group"
 
     def raw(self):
         return self.__M
