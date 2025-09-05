@@ -3,14 +3,18 @@ from libs import Void
 from utils import DynamicConfig
 from neonize.events import MessageEv
 
+
 def clean_number(number):
-    """Ensure the number is a string in international format, e.g., +212…"""
+    """Normalize number to digits only with optional '+' at start."""
     if isinstance(number, int):
         number = str(number)
     number = re.sub(r"[^\d+]", "", number)
-    if not number.startswith("+"):
-        number = "+" + number
+    if number.startswith("00"):
+        number = "+" + number[2:]
+    elif number.startswith("0"):
+        number = number[1:]
     return number
+
 
 class MessageClass:
     def __init__(self, client: Void, message: MessageEv):
@@ -23,17 +27,13 @@ class MessageClass:
         self.gcjid = self.Info.MessageSource.Chat
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
-        # Extract real sender number
-        raw_sender = self.Info.MessageSource.Sender.User
-        self.sender_number = clean_number(raw_sender)
+        # Use the sender JID object directly
+        sender_jid_obj = self.Info.MessageSource.Sender
+        self.sender_number = clean_number(sender_jid_obj.User)
         self.sender = DynamicConfig(
             {
                 "number": self.sender_number,
-                "username": getattr(
-                    client.contact.get_contact(self.sender_number), 
-                    "PushName", 
-                    "Unknown"
-                ),
+                "username": getattr(sender_jid_obj, "PushName", "Unknown"),
             }
         )
 
@@ -55,7 +55,7 @@ class MessageClass:
                         {
                             "number": quoted_number,
                             "username": getattr(
-                                client.contact.get_contact(quoted_number),
+                                client.contact.get_contact(ctx_info.participant),
                                 "PushName",
                                 "Unknown",
                             ),
@@ -69,9 +69,7 @@ class MessageClass:
                         {
                             "number": number,
                             "username": getattr(
-                                client.contact.get_contact(number),
-                                "PushName",
-                                "Unknown",
+                                client.contact.get_contact(jid), "PushName", "Unknown"
                             ),
                         }
                     )
@@ -79,7 +77,10 @@ class MessageClass:
 
     def build(self):
         self.urls = self.__client.utils.get_urls(self.content)
-        self.numbers = [clean_number(n) for n in self.__client.utils.extract_numbers(self.content)]
+        # Extract numbers from text and clean them
+        self.numbers = [
+            clean_number(n) for n in self.__client.utils.extract_numbers(self.content)
+        ]
 
         if self.chat == "group":
             self.group = self.__client.get_group_info(self.gcjid)
