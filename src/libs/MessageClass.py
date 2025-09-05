@@ -14,14 +14,18 @@ class MessageClass:
         self.gcjid = self.Info.MessageSource.Chat
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
-        # ✅ FIXED sender number extraction
-        sender_jid = f"{self.Info.MessageSource.Sender.User}@{self.Info.MessageSource.Sender.Server}"
-        sender_number = sender_jid.split("@")[0]
+        sender_jid = self.Info.MessageSource.Sender.User
+        # Safely get sender username
+        try:
+            contact = client.contact.get_contact(sender_jid)
+            username = getattr(contact, "PushName", sender_jid)
+        except Exception:
+            username = sender_jid
 
         self.sender = DynamicConfig(
             {
-                "number": sender_number,
-                "username": client.contact.get_contact(sender_jid).PushName,
+                "number": sender_jid,
+                "username": username,
             }
         )
 
@@ -38,22 +42,34 @@ class MessageClass:
                 self.quoted = ctx_info.quotedMessage
 
                 if ctx_info.HasField("participant"):
-                    quoted_jid = ctx_info.participant
-                    quoted_number = quoted_jid.split("@")[0]
+                    quoted_number = ctx_info.participant.split("@")[0]
+                    try:
+                        quoted_contact = client.contact.get_contact(quoted_number)
+                        quoted_username = getattr(quoted_contact, "PushName", quoted_number)
+                    except Exception:
+                        quoted_username = quoted_number
+
                     self.quoted_user = DynamicConfig(
                         {
                             "number": quoted_number,
-                            "username": client.contact.get_contact(quoted_jid).PushName,
+                            "username": quoted_username,
                         }
                     )
 
+            # Handle mentioned users safely
             for jid in ctx_info.mentionedJID:
                 number = jid.split("@")[0]
+                try:
+                    contact = client.contact.get_contact(number)
+                    username = getattr(contact, "PushName", number)
+                except Exception:
+                    username = number
+
                 self.mentioned.append(
                     DynamicConfig(
                         {
                             "number": number,
-                            "username": client.contact.get_contact(jid).PushName,
+                            "username": username,
                         }
                     )
                 )
@@ -63,10 +79,16 @@ class MessageClass:
         self.numbers = self.__client.utils.extract_numbers(self.content)
 
         if self.chat == "group":
-            self.group = self.__client.get_group_info(self.gcjid)
+            try:
+                self.group = self.__client.get_group_info(self.gcjid)
+            except Exception:
+                self.group = None
+
             self.isAdminMessage = (
                 self.sender.number
                 in self.__client.filter_admin_users(self.group.Participants)
+                if self.group
+                else False
             )
 
         return self
