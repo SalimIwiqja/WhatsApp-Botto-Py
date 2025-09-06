@@ -16,6 +16,17 @@ def clean_number(number):
     return number
 
 
+def get_push_name(client: Void, jid: str) -> str:
+    """Safely get the PushName of a JID, fallback to 'Unknown' if not available."""
+    try:
+        contact_obj = client.contact.get_contact(jid)
+        if isinstance(contact_obj, str) or contact_obj is None:
+            return "Unknown"
+        return getattr(contact_obj, "PushName", "Unknown")
+    except Exception:
+        return "Unknown"
+
+
 class MessageClass:
     def __init__(self, client: Void, message: MessageEv):
         self.__client = client
@@ -33,7 +44,8 @@ class MessageClass:
         self.sender = DynamicConfig(
             {
                 "number": self.sender_number,
-                "username": getattr(sender_jid_obj, "PushName", "Unknown"),
+                "username": getattr(sender_jid_obj, "PushName", "Unknown")
+                or get_push_name(client, sender_jid_obj.User),
             }
         )
 
@@ -43,21 +55,17 @@ class MessageClass:
         self.quoted_user = None
         self.mentioned = []
 
-        # Handle quoted messages
+        # Handle quoted messages and mentions
         if self.Message.HasField("extendedTextMessage"):
             ctx_info = self.Message.extendedTextMessage.contextInfo
 
+            # Quoted message
             if ctx_info.HasField("quotedMessage"):
                 self.quoted = ctx_info.quotedMessage
 
                 if ctx_info.HasField("participant"):
                     quoted_number = clean_number(ctx_info.participant.split("@")[0])
-                    contact_obj = client.contact.get_contact(ctx_info.participant)
-                    username = (
-                        getattr(contact_obj, "PushName", "Unknown")
-                        if not isinstance(contact_obj, str)
-                        else "Unknown"
-                    )
+                    username = get_push_name(client, ctx_info.participant)
                     self.quoted_user = DynamicConfig(
                         {
                             "number": quoted_number,
@@ -65,28 +73,24 @@ class MessageClass:
                         }
                     )
 
-            # Handle mentioned users
-            for jid in ctx_info.mentionedJID:
-                number = clean_number(jid.split("@")[0])
-                contact_obj = client.contact.get_contact(jid)
-                username = (
-                    getattr(contact_obj, "PushName", "Unknown")
-                    if not isinstance(contact_obj, str)
-                    else "Unknown"
-                )
-                self.mentioned.append(
-                    DynamicConfig(
-                        {
-                            "number": number,
-                            "username": username,
-                        }
+            # Mentioned users
+            if hasattr(ctx_info, "mentionedJID"):
+                for jid in ctx_info.mentionedJID:
+                    number = clean_number(jid.split("@")[0])
+                    username = get_push_name(client, jid)
+                    self.mentioned.append(
+                        DynamicConfig(
+                            {
+                                "number": number,
+                                "username": username,
+                            }
+                        )
                     )
-                )
 
     def build(self):
         # Extract URLs
         self.urls = self.__client.utils.get_urls(self.content)
-        # Extract numbers from text and clean them
+        # Extract numbers from text
         self.numbers = [
             clean_number(n) for n in self.__client.utils.extract_numbers(self.content)
         ]
