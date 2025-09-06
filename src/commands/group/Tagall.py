@@ -37,8 +37,12 @@ class Command(BaseCommand):
         text = "📢 Attention everyone!\n\n"
 
         for p in group.Participants:
-            number = p.split("@")[0] if "@" in p else p
+            # Get the user number safely
+            number = getattr(p.JID, "User", None)
+            if not number:
+                continue  # skip if no valid number
             mentions.append(number)
             text += f"@{number} "
 
+        # Send the message with mentions
         self.client.send_message(M.gcjid, text.strip(), mentions=mentions)
