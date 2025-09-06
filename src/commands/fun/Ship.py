@@ -1,6 +1,6 @@
 import random
 from libs import BaseCommand, MessageClass
-
+from libs.MessageClass import clean_number  # import the utility
 
 class Command(BaseCommand):
     def __init__(self, client, handler):
@@ -29,7 +29,6 @@ class Command(BaseCommand):
             if M.sender not in users:
                 users.append(M.sender)
             else:
-                # Avoid self-ship if already in list
                 break
 
         if len(users) < 2:
@@ -37,7 +36,6 @@ class Command(BaseCommand):
                 "❌ Please mention or reply to *someone* to ship with.", M
             )
 
-        # Flip users if sender is in the first position
         if users[0] == M.sender:
             users = users[::-1]
 
@@ -58,12 +56,12 @@ class Command(BaseCommand):
         else:
             level = "Amazing 💞"
 
-        first = f"@{users[0].number}"
-        second = f"@{users[1].number}"
+        first = clean_number(users[0].number)
+        second = clean_number(users[1].number)
 
         message = (
             "```🔺 Compatibility Meter 🔺```\n\n"
-            f"💖 {first} x {second} 💖\n"
+            f"💖 @{first} x @{second} 💖\n"
             f"*🔻 {percentage}% {level} 🔻*"
         )
 
