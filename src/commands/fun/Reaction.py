@@ -1,4 +1,4 @@
-from libs import BaseCommand, MessageClass
+from libs import BaseCommand, MessageClass, get_push_name
 
 REACTIONS = {
     "bite": "Bit",
@@ -54,12 +54,10 @@ class Command(BaseCommand):
         text = contex.text.strip() if contex.text else ""
         raw_mode = cmd not in ("reaction", "r")
 
-        # Validate
+        # Determine reaction
         reaction = cmd if raw_mode else text.split(" ")[0].lower()
         if not raw_mode and not text:
-            usage = "\n- " + "\n- ".join(
-                r.capitalize() for r in REACTIONS.keys()
-            )
+            usage = "\n- " + "\n- ".join(r.capitalize() for r in REACTIONS.keys())
             return self.client.reply_message(
                 f"🎃 *Available Reactions:*\n{usage}\n\n🛠️ *Usage:* {self.client.config.prefix}reaction <type> [tag or quote user]\nExample: {self.client.config.prefix}pat",
                 M,
@@ -72,28 +70,20 @@ class Command(BaseCommand):
             )
 
         try:
-            target = M.quoted_user or (
-                M.mentioned[0] if M.mentioned else M.sender
-            )
+            target = M.quoted_user or (M.mentioned[0] if M.mentioned else M.sender)
             single = target == M.sender
 
-            api_data = self.client.utils.fetch(
-                f"https://api.waifu.pics/sfw/{reaction}"
-            )
+            api_data = self.client.utils.fetch(f"https://api.waifu.pics/sfw/{reaction}")
             gif_url = api_data["url"]
             gif_buffer = self.client.utils.fetch_buffer(gif_url)
 
             caption = f"*@{M.sender.number} {REACTIONS[reaction]}* "
-            caption += (
-                "*themselves*"
-                if single
-                else f"*@{target.number.split('@')[0]}*"
-            )
+            caption += "*themselves*" if single else f"*@{target.number}*"
 
             self.client.send_video(
                 M.gcjid,
                 gif_buffer,
-                caption=f"{caption}",
+                caption=caption,
                 quoted=M,
                 gifplayback=True,
                 is_gif=True,
