@@ -1,5 +1,6 @@
 from datetime import datetime
 from libs import BaseCommand, MessageClass
+from libs.MessageClass import clean_number
 from utils import get_rank
 
 
@@ -33,7 +34,7 @@ class Command(BaseCommand):
             if mode == "global":
                 users = list(self.client.db.models["user"].objects.all())
             else:
-                participant_ids = [p.JID.User for p in M.group.Participants]
+                participant_ids = [clean_number(p.JID.User) for p in M.group.Participants]
                 users = list(
                     self.client.db.models["user"].objects.raw(
                         {"number": {"$in": participant_ids}}
@@ -50,9 +51,9 @@ class Command(BaseCommand):
             now = datetime.now()
             for idx, user in enumerate(users[:10], 1):
                 contact = self.client.contact.get_contact(
-                    self.client.build_jid(user.number)
+                    self.client.build_jid(clean_number(user.number))
                 )
-                name = contact.PushName or "Unknown"
+                name = getattr(contact, "PushName", "Unknown")
                 joined_at = user.created_at.strftime("%d-%b-%Y")
                 rank = get_rank(user.exp)
                 time_taken = self.client.utils.format_timedelta(
