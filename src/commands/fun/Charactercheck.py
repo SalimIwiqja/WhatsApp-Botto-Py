@@ -66,7 +66,8 @@ Example: {self.client.config.prefix}awesomecheck"""
 
         # Determine target
         target = M.quoted_user or (M.mentioned[0] if M.mentioned else M.sender)
-        target_tag = f"@{target.number}"
+        target_number = target.number
+        target_tag = f"@{target_number}"
 
         # Result generation
         percentage = random.randint(1, 100)
