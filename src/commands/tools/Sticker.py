@@ -20,7 +20,7 @@ class Command(BaseCommand):
 
     def exec(self, M: MessageClass, contex):
         try:
-            author, pack = "Created by", "Void"
+            author, pack = "Created by", "Yuito"
             if contex.text:
                 parts = [part.strip() for part in contex.text.split("|", 1)]
                 if parts:
