@@ -1,4 +1,5 @@
 from libs import BaseCommand, MessageClass
+from libs.MessageClass import clean_number
 from utils import get_rank
 
 
@@ -24,10 +25,11 @@ class Command(BaseCommand):
             target = M.quoted_user or (
                 M.mentioned[0] if M.mentioned else M.sender
             )
-            jid = self.client.build_jid(target.number)
+            target_number = clean_number(target.number)
+            jid = self.client.build_jid(target_number)
             username = target.username
 
-            user = self.client.db.get_user_by_number(jid.User)
+            user = self.client.db.get_user_by_number(target_number)
             rank = get_rank(user.exp)
 
             try:
@@ -50,7 +52,7 @@ class Command(BaseCommand):
             message = (
                 f"👤 *User Profile* 👤\n\n"
                 f"📛 *Username:* {username}\n\n"
-                f"📱 *Number:* {jid.User}\n\n"
+                f"📱 *Number:* {target_number}\n\n"
                 f"💬 *Bio:* {bio}\n\n"
                 f"🎖️ *Rank:* {rank['name']} {rank['data']['emoji']}\n\n"
                 f"✨ *EXP:* {user.exp}\n\n"
