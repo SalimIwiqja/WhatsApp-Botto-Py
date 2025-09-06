@@ -1,8 +1,6 @@
 from libs import BaseCommand, MessageClass
-from utils import (
-    get_rank,
-    ranks,
-)  # assuming `ranks` is a dict with exp thresholds
+from libs.MessageClass import clean_number
+from utils import get_rank, ranks  # assuming `ranks` is a dict with exp thresholds
 
 
 class Command(BaseCommand):
@@ -22,7 +20,8 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, _):
-        user = self.client.db.get_user_by_number(M.sender.number)
+        sender_number = clean_number(M.sender.number)
+        user = self.client.db.get_user_by_number(sender_number)
         exp = user.exp
         current_rank = get_rank(exp)
         current_name = current_rank["name"]
