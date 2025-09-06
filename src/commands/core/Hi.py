@@ -1,5 +1,5 @@
 from libs import BaseCommand, MessageClass
-
+from libs.MessageClass import clean_number  # import the utility
 
 class Command(BaseCommand):
 
@@ -16,9 +16,10 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, _):
-        user = self.client.db.get_user_by_number(M.sender.number)
+        sender_number = clean_number(M.sender.number)
+        user = self.client.db.get_user_by_number(sender_number)
         exp = getattr(user, "exp", 0)
 
         self.client.reply_message(
-            f"🎯 Hey *@{M.sender.number}*! Your current EXP is: *{exp}*.", M
+            f"🎯 Hey *@{sender_number}*! Your current EXP is: *{exp}*.", M
         )
