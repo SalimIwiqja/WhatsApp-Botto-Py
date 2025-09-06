@@ -20,6 +20,7 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
+        # Ensure this command is used in a group
         if M.chat != "group":
             return self.client.reply_message(
                 "⚠️ This command can only be used in a group.", M
@@ -35,11 +36,11 @@ class Command(BaseCommand):
         text = "📢 Attention everyone!\n\n"
 
         for participant in group.Participants:
-            number = getattr(participant.JID, "User", None)
-            if not number:
-                continue
+            # Extract full JID string
+            jid_str = str(participant.JID)
+            number = jid_str.split("@")[0]  # Actual WhatsApp number
             mention_jids.append(participant.JID)
             text += f"@{number} "
 
-        # Use 'mention' keyword instead of 'context'
+        # Send message with correct mentions
         self.client.send_message(M.gcjid, text.strip(), mention=mention_jids)
