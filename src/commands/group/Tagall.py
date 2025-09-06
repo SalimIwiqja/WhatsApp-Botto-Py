@@ -20,29 +20,26 @@ class Command(BaseCommand):
         )
 
     def exec(self, M: MessageClass, contex):
-        # Ensure this is a group
         if M.chat != "group":
             return self.client.reply_message(
                 "⚠️ This command can only be used in a group.", M
             )
 
-        # Get group participants
         group = M.group
         if not group or not hasattr(group, "Participants"):
             return self.client.reply_message(
                 "⚠️ Failed to get group info. No participants found.", M
             )
 
-        # Build mentions list and display text
         mention_jids = []
         text = "📢 Attention everyone!\n\n"
 
         for participant in group.Participants:
             number = getattr(participant.JID, "User", None)
             if not number:
-                continue  # skip invalid participants
+                continue
             mention_jids.append(participant.JID)
             text += f"@{number} "
 
-        # Send message with context mentions
-        self.client.send_message(M.gcjid, text.strip(), context={"mentionedJid": mention_jids})
+        # Use 'mention' keyword instead of 'context'
+        self.client.send_message(M.gcjid, text.strip(), mention=mention_jids)
