@@ -1,4 +1,5 @@
 from libs import BaseCommand, MessageClass
+from libs.MessageClass import clean_number
 
 
 class Command(BaseCommand):
@@ -21,19 +22,16 @@ class Command(BaseCommand):
     def exec(self, M: MessageClass, _):
         try:
             group_info = M.group
-            group_data = self.client.db.get_group_by_number(M.gcjid.User)
+            gcjid_number = clean_number(M.gcjid.User)
+            group_data = self.client.db.get_group_by_number(gcjid_number)
 
             try:
                 pfp_url = self.client.get_profile_picture(M.gcjid.User).URL
             except Exception:
                 pfp_url = "https://www.pngall.com/wp-content/uploads/5/Profile-PNG-File.png"
 
-            subject = (
-                group_info.GroupName.Name if group_info.GroupName else "N/A"
-            )
-            description = (
-                group_info.GroupTopic if group_info.GroupTopic.Topic else "N/A"
-            )
+            subject = group_info.GroupName.Name if group_info.GroupName else "N/A"
+            description = group_info.GroupTopic.Topic if group_info.GroupTopic.Topic else "N/A"
             participants = group_info.Participants or []
             admins = self.client.filter_admin_users(participants)
             admin_count = len(admins)
