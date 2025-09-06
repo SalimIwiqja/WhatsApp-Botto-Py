@@ -1,5 +1,6 @@
 from libs import BaseCommand, MessageClass
 from neonize.utils import ParticipantChange
+from libs.MessageClass import clean_number
 
 
 class Command(BaseCommand):
@@ -25,12 +26,16 @@ class Command(BaseCommand):
             targets = M.mentioned or ([M.quoted_user] if M.quoted_user else [])
             if not targets:
                 return self.client.reply_message(
-                    "❌ Please *mention or quote* to a user to remove.", M
+                    "❌ Please *mention or quote* a user to remove.", M
                 )
 
+            # Normalize numbers
+            target_jids = [self.client.build_jid(clean_number(u.number)) for u in targets]
+            gcjid_normalized = self.client.build_jid(clean_number(M.gcjid.User))
+
             self.client.update_group_participants(
-                M.gcjid,
-                [self.client.build_jid(u.number) for u in targets],
+                gcjid_normalized,
+                target_jids,
                 ParticipantChange.REMOVE,
             )
 
