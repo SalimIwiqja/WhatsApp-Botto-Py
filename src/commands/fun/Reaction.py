@@ -1,4 +1,4 @@
-from libs import BaseCommand, MessageClass, get_push_name
+from libs import BaseCommand, MessageClass
 
 REACTIONS = {
     "bite": "Bit",
@@ -54,7 +54,7 @@ class Command(BaseCommand):
         text = contex.text.strip() if contex.text else ""
         raw_mode = cmd not in ("reaction", "r")
 
-        # Determine reaction
+        # Get reaction type
         reaction = cmd if raw_mode else text.split(" ")[0].lower()
         if not raw_mode and not text:
             usage = "\n- " + "\n- ".join(r.capitalize() for r in REACTIONS.keys())
@@ -78,12 +78,12 @@ class Command(BaseCommand):
             gif_buffer = self.client.utils.fetch_buffer(gif_url)
 
             caption = f"*@{M.sender.number} {REACTIONS[reaction]}* "
-            caption += "*themselves*" if single else f"*@{target.number}*"
+            caption += "*themselves*" if single else f"*@{target.number.split('@')[0]}*"
 
             self.client.send_video(
                 M.gcjid,
                 gif_buffer,
-                caption=caption,
+                caption=f"{caption}",
                 quoted=M,
                 gifplayback=True,
                 is_gif=True,
