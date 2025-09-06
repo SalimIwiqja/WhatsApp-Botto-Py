@@ -39,13 +39,13 @@ class MessageClass:
         self.chat = "group" if self.Info.MessageSource.IsGroup else "dm"
 
         # Sender
-        sender_jid_obj = self.Info.MessageSource.Sender
-        self.sender_number = clean_number(sender_jid_obj.User)
+        sender_jid = str(self.Info.MessageSource.Sender)  # Full JID string
+        self.sender_number = clean_number(sender_jid.split("@")[0])
         self.sender = DynamicConfig(
             {
                 "number": self.sender_number,
-                "username": getattr(sender_jid_obj, "PushName", "Unknown")
-                or get_push_name(client, sender_jid_obj.User),
+                "username": getattr(self.Info.MessageSource.Sender, "PushName", "Unknown")
+                or get_push_name(client, sender_jid),
             }
         )
 
@@ -64,8 +64,9 @@ class MessageClass:
                 self.quoted = ctx_info.quotedMessage
 
                 if ctx_info.HasField("participant"):
-                    quoted_number = clean_number(ctx_info.participant.split("@")[0])
-                    username = get_push_name(client, ctx_info.participant)
+                    quoted_jid = str(ctx_info.participant)
+                    quoted_number = clean_number(quoted_jid.split("@")[0])
+                    username = get_push_name(client, quoted_jid)
                     self.quoted_user = DynamicConfig(
                         {
                             "number": quoted_number,
@@ -76,8 +77,9 @@ class MessageClass:
             # Mentioned users
             if hasattr(ctx_info, "mentionedJID"):
                 for jid in ctx_info.mentionedJID:
-                    number = clean_number(jid.split("@")[0])
-                    username = get_push_name(client, jid)
+                    jid_str = str(jid)
+                    number = clean_number(jid_str.split("@")[0])
+                    username = get_push_name(client, jid_str)
                     self.mentioned.append(
                         DynamicConfig(
                             {
