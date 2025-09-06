@@ -33,16 +33,16 @@ class Command(BaseCommand):
                 "⚠️ Failed to get group info. No participants found.", M
             )
 
-        mentions = []
+        # Build mentions list and display text
+        mention_jids = []
         text = "📢 Attention everyone!\n\n"
 
-        for p in group.Participants:
-            # Get the user number safely
-            number = getattr(p.JID, "User", None)
+        for participant in group.Participants:
+            number = getattr(participant.JID, "User", None)
             if not number:
-                continue  # skip if no valid number
-            mentions.append(number)
+                continue  # skip invalid participants
+            mention_jids.append(participant.JID)
             text += f"@{number} "
 
-        # Send the message with mentions
-        self.client.send_message(M.gcjid, text.strip(), mentions=mentions)
+        # Send message with context mentions
+        self.client.send_message(M.gcjid, text.strip(), context={"mentionedJid": mention_jids})
