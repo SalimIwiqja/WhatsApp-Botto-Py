@@ -1,6 +1,6 @@
 import random
 from libs import BaseCommand, MessageClass
-
+from libs.MessageClass import clean_number  # import the utility
 
 class Command(BaseCommand):
     def __init__(self, client, handler):
@@ -28,12 +28,15 @@ class Command(BaseCommand):
                     "⚠️ No *members* found in this group.", M
                 )
 
-            participants_ids = [m.JID.User for m in members]
-            picked = self.client.utils.get_random_item(participants_ids)
+            # Normalize all member numbers
+            participants_numbers = [
+                clean_number(p.JID.User) for p in members
+            ]
+            picked_number = random.choice(participants_numbers)
             tag_text = contex.text.strip() if contex.text else "Random_Pick"
 
             self.client.reply_message(
-                f"🎲 *{tag_text}:* @{picked.split('@')[0]}", M
+                f"🎲 *{tag_text}:* @{picked_number}", M
             )
 
         except Exception as e:
