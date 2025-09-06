@@ -25,7 +25,7 @@ class Command(BaseCommand):
 
             buffer = self.client.utils.fetch_buffer(selected_url)
             self.client.send_sticker(
-                M.gcjid, buffer, quoted=M, name="Created by", packname="Void"
+                M.gcjid, buffer, quoted=M, name="Created by", packname="Yuito"
             )
 
         except Exception as e:
