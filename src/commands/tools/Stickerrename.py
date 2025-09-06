@@ -43,7 +43,7 @@ class Command(BaseCommand):
             pack = (
                 parts[1].strip()
                 if len(parts) > 1 and parts[1].strip()
-                else "Void"
+                else "Yuito"
             )
 
             sticker_media = self.client.download_any(M.quoted)
